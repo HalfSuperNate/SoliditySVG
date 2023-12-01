@@ -43,7 +43,7 @@ SVG Examples & Info:
 
 */
 
-contract SVG {
+contract SVGPlotter {
     using LibPRNG for LibPRNG.PRNG;
     using LibString for uint256;
     using LibString for int256;
@@ -51,36 +51,72 @@ contract SVG {
     using Base64 for string;
 
     string constant __ = " "; // whitespace
-    string constant stroke = "stroke=";
-    string constant strokeWidth = "stroke-width=";
-    string constant fill = "fill=";
+    string constant stroke = '" stroke="';
+    string constant strokeWidth = ' stroke-width="';
+    string constant fill = ' fill="';
     string constant _startElement = "<";
-    string constant _endElement = "/>";
+    string constant _endElement = " />";
     string constant _dq = '"';
+    string constant none = '"none"';
+    string constant height = ' height="';
+    string constant width = ' width="';
+    string constant background = ' style="background:#';
+    string constant _endStyle = ';"';
 
-    struct _SVG {
-        uint256 size;
-        string background;
+
+    struct SVG {
+        uint256[2] heightWidth;
+        uint256[4] backgroundColor;
         string[] elements;
     }
 
-    //too deep here
-    function createSVG(_SVG memory svg) public pure returns (string memory) {
+    struct StrokeFill {
+        uint256 strokeWidth;
+        uint256[4] stroke;
+        uint256[4] fill;
+    }
+
+    struct Points {
+        uint256[] x;
+        uint256[] y;
+    }
+
+    function createSVG(SVG memory svg) public pure returns (string memory) {
         string memory elements = "";
         for (uint256 i = 0; i < svg.elements.length; i++) {
             elements = string(abi.encodePacked(elements, svg.elements[i]));
         }
 
         return string(abi.encodePacked(
-            "<svg height=", _dq, svg.size.toString(), _dq,
-            " width=", _dq, svg.size.toString(), _dq,
-            " style=", _dq, svg.background, _dq,
-            ">", elements, "</svg>"
+            setSVG(svg), elements, "Sorry, your browser does not support inline SVG.</svg>"
         ));
+    }
+
+    function setSVG(SVG memory svg) public pure returns (string memory) {
+        return string.concat(
+            "<svg", 
+            getHeightWidth(svg.heightWidth[0],svg.heightWidth[1]),
+            getBackground(svg.backgroundColor), _endStyle,
+            ">"
+        );
     }
 
     function createElement(string memory elementType, string memory attributes) internal pure returns (string memory) {
         return string(abi.encodePacked(_startElement, elementType, __, attributes, __, _endElement));
+    }
+
+    function getHeightWidth(uint256 _height, uint256 _width) public pure returns (string memory) {
+        return string.concat(
+            height, _height.toString(), _dq,
+            width, _width.toString(), _dq
+        );
+    }
+
+    function getBackground(uint256[4] memory _color) public pure returns (string memory) {
+        return string.concat(
+            background,
+            uintToColorHex(false, _color[0], _color[1], _color[2], _color[3])
+        );
     }
 
     /**
@@ -114,5 +150,87 @@ contract SVG {
 
     function isEvenTimestamp() public view returns (bool) {
         return block.timestamp % 2 == 0;
+    }
+
+    // Color & Alpha/Opacity
+    // 4 Channels (Red, Green, Blue, Alpha)
+    // Each channel is equal to a uint slider 0 - 255
+    // If Alpha channel is omitted color will default to full Alpha
+    // 255 = ff (full channel)
+
+    function uintToColorHex(bool prependHash, uint256 red, uint256 green, uint256 blue, uint256 alpha) public pure returns (string memory) {
+        string memory _alpha = "";
+        if (!compareHexStrings(bytes(toHexString(alpha)), bytes("ff"))) {
+            // set alpha if not full
+            _alpha = toHexString(alpha);
+        }
+        
+        if(prependHash){
+            return string(abi.encodePacked("#", toHexString(red), toHexString(green), toHexString(blue), _alpha));
+        } else{
+            return string(abi.encodePacked(toHexString(red), toHexString(green), toHexString(blue), _alpha));
+        }
+    } 
+
+    function uintToHex(uint256 number) public pure returns (string memory) {
+        // Convert uint to hexadecimal string
+        return toHexString(number);
+    }
+
+    function toHexString(uint256 value) internal pure returns (string memory) {
+        if (value == 0) {
+            return "00";  // Special case for zero
+        }
+        
+        uint256 temp = value;
+        uint256 length = 0;
+        
+        while (temp > 0) {
+            length++;
+            temp /= 16;
+        }
+
+        // Ensure even length
+        if (length % 2 != 0) {
+            length++;
+        }
+
+        bytes memory buffer = new bytes(length);
+        while (value > 0) {
+            length--;
+            uint8 remainder = uint8(value % 16);
+            bytes1 byteValue = toAsciiChar(remainder);
+            buffer[length] = byteValue;
+            value /= 16;
+        }
+
+        // Prepend "0" if the length is one
+        if (length == 1) {
+            return string(abi.encodePacked("0", buffer));
+        } else {
+            return string(buffer);
+        }
+    }
+
+    function toAsciiChar(uint8 value) internal pure returns (bytes1) {
+        if (value < 10) {
+            return bytes1(uint8(48 + value));
+        } else {
+            return bytes1(uint8(87 + value)); // ASCII for 'a' is 97, so 87 + 10 = 97
+        }
+    }
+
+    function compareHexStrings(bytes memory a, bytes memory b) internal pure returns (bool) {
+        if (a.length != b.length) {
+            return false;
+        }
+
+        for (uint i = 0; i < a.length; i++) {
+            if (a[i] != b[i]) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
