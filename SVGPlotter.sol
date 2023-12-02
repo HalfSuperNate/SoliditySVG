@@ -62,6 +62,9 @@ contract SVGPlotter {
     string constant width = ' width="';
     string constant background = ' style="background:#';
     string constant _endStyle = ';"';
+    string constant _startGroup = '<g';
+    string constant _endGroup = '</g>';
+    string constant _n = "-"; // negative
 
 
     struct SVG {
@@ -76,10 +79,28 @@ contract SVGPlotter {
         uint256[4] fill;
     }
 
-    struct Points {
-        uint256[] x;
-        uint256[] y;
+    struct ElementData {
+        /*
+            polygon = uses at least 3 points where 1st and last point is connected
+            circle = uses 2 points, 1st point is center position, 2nd is radius x = y
+            ellipse = uses 2 points, 1st point is center position, 2nd is radius x & radius y
+            rect = uses 2 points, 1st is top left corner position, 2nd is width & height from 1st point
+            line = uses 2 points, 1st is start position, 2nd is end position
+            polyline = uses at least 3 points
+        */
+        string elementType;
+        // point position(s)
+        int256[] x;
+        int256[] y;
+        // transform="translate(0, 0) rotate(0) scale(1)"
     }
+
+    struct Transform {
+        int256[2] position;
+        int256 rotation;
+        int256 scale;
+    }
+
 
     function createSVG(SVG memory svg) public pure returns (string memory) {
         string memory elements = "";
