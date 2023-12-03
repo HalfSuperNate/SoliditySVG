@@ -76,7 +76,9 @@ contract SVGPlotter {
     struct StrokeFill {
         uint256 strokeWidth;
         uint256[4] stroke;
+        uint256[4][2] randomizeStroke; // if [0,0] ignore
         uint256[4] fill;
+        uint256[4][2] randomizeFill; // if [0,0] ignore
     }
 
     struct ElementData {
@@ -93,7 +95,9 @@ contract SVGPlotter {
         string elementType;
         // point position(s)
         int256[] x;
+        int256[][2] randomizeX; // if [0,0] ignore
         int256[] y;
+        int256[][2] randomizeY; // if [0,0] ignore
         /*
             Path Command Notes:
                 Capital = absolute position
@@ -113,19 +117,15 @@ contract SVGPlotter {
         string[] pathCommands;
 
         // inline transform and stroke/fill can be added when element is created
-        // default transform="translate(0, 0) rotate(0) scale(1)"
     }
 
     struct Transform {
+        bool useDefault; // default transform="translate(0, 0) rotate(0) scale(1)"
         int256[2] position;
-        int256 rotation;
+        int256[3] rotation;
         int256 scale;
+        uint256[4][2] randomizeXYRS; // if [0,0] ignore
     }
-
-    function negativeNum(int256 num) external pure returns (string memory) {
-        return num.toString();
-    }
-
 
     function createSVG(SVG memory svg) public pure returns (string memory) {
         string memory elements = "";
@@ -147,8 +147,31 @@ contract SVGPlotter {
         );
     }
 
-    function createElement(string memory elementType, string memory attributes) internal pure returns (string memory) {
-        return string(abi.encodePacked(_startElement, elementType, __, attributes, __, _endElement));
+    //❌ working on this
+    function createElement(ElementData memory _elementData, StrokeFill memory _strokeFill, Transform memory _transform) internal pure returns (string memory) {
+        string memory attributes;
+        // Data
+        // Stroke & Fill
+        if(_strokeFill.strokeWidth != 0 && _strokeFill.stroke[3] != 0) {
+            attributes = string(abi.encodePacked(attributes, stroke, strokeWidth, fill));
+        } else{
+            //transparent or no stroke
+            attributes = string(abi.encodePacked(attributes, stroke, strokeWidth, fill));
+        }
+        if(_strokeFill.fill[3] != 0) {
+            attributes = string(abi.encodePacked(attributes, stroke, strokeWidth, fill));
+        } else{
+            //transparent or no fill
+            attributes = string(abi.encodePacked(attributes, stroke, strokeWidth, fill));
+        }
+        
+        // Inline Transform
+        if(!_transform.useDefault) {
+            attributes = string(abi.encodePacked(attributes, ' transform="translate(', _transform.position[0],",", _transform.position[1],' rotate(', _transform.rotation[0], ",",  _transform.rotation[1], ",",  _transform.rotation[2], ') scale(',  _transform.scale, ')"' ));
+        } else{
+            //use nothing to default to transform="translate(0, 0) rotate(0) scale(1)"
+        }
+        return string(abi.encodePacked(_startElement, _elementData.elementType, __, attributes, __, _endElement));
     }
 
     function getHeightWidth(uint256 _height, uint256 _width) public pure returns (string memory) {
@@ -172,7 +195,7 @@ contract SVGPlotter {
     @param _max The max random result.
     @return A random selected number within the inclusive range.
     */
-    function getRandom(uint _seed, uint _min, uint _max) public view returns (uint256){
+    function getRandom(uint _seed, int _min, int _max) public view returns (int256){
         uint random = uint(keccak256(abi.encodePacked(
             block.timestamp,
             block.prevrandao,
@@ -186,10 +209,10 @@ contract SVGPlotter {
         LibPRNG.PRNG memory newPRNG = LibPRNG.PRNG({
             state: random
         });
-        uint _newPRNG = LibPRNG.uniform(newPRNG,101);
+        int _newPRNG = int(LibPRNG.uniform(newPRNG,101));
 
-        uint _dif = (_max - _min);
-        uint _calcRandom = ((_dif * _newPRNG) / 100);
+        int _dif = (_max - _min);
+        int _calcRandom = ((_dif * _newPRNG) / 100);
 
         return _min + _calcRandom;
     }
