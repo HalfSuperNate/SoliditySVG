@@ -80,6 +80,7 @@ contract SVGPlotter {
     }
 
     struct ElementData {
+        uint256 decimals; // number of decimal points for floats
         /*
             polygon = uses at least 3 points where 1st and last point is connected
             circle = uses 2 points, 1st point is center position, 2nd is radius x = y
@@ -87,18 +88,42 @@ contract SVGPlotter {
             rect = uses 2 points, 1st is top left corner position, 2nd is width & height from 1st point
             line = uses 2 points, 1st is start position, 2nd is end position
             polyline = uses at least 3 points
+            path = uses points and letter commands to create a complex line or shape
         */
         string elementType;
         // point position(s)
         int256[] x;
         int256[] y;
-        // transform="translate(0, 0) rotate(0) scale(1)"
+        /*
+            Path Command Notes:
+                Capital = absolute position
+                lowercase = relative position
+            Path Commands:
+                M = moveto
+                L = lineto
+                H = horizontal lineto
+                V = vertical lineto
+                C = curveto
+                S = smooth curveto
+                Q = quadratic Bézier curve
+                T = smooth quadratic Bézier curveto
+                A = elliptical Arc
+                Z = closepath
+        */
+        string[] pathCommands;
+
+        // inline transform and stroke/fill can be added when element is created
+        // default transform="translate(0, 0) rotate(0) scale(1)"
     }
 
     struct Transform {
         int256[2] position;
         int256 rotation;
         int256 scale;
+    }
+
+    function negativeNum(int256 num) external pure returns (string memory) {
+        return num.toString();
     }
 
 
@@ -253,5 +278,71 @@ contract SVGPlotter {
         }
 
         return true;
+    }
+
+    // Number to Float
+    function intToFloat(int256 number, uint256 decimals) external pure returns (string memory) {
+        require(decimals <= 18, "Decimals too large");
+        bool isNegative = number < 0;
+        uint256 absoluteValue = isNegative ? uint256(-number) : uint256(number);
+
+        uint256 divisor = 10**decimals;
+        uint256 prefix = absoluteValue / divisor;
+        uint256 suffix = absoluteValue % divisor;
+
+        string memory result = toFloat(prefix, suffix, decimals);
+
+        if (isNegative) {
+            result = string(abi.encodePacked("-", result));
+        }
+
+        return result;
+    }
+
+    function toFloat(uint256 prefix, uint256 suffix, uint256 decimals) public pure returns (string memory) {
+        string memory result = string(abi.encodePacked(uintToString(prefix)));
+
+        if (decimals > 0) {
+            result = string(abi.encodePacked(result, ".", padWithZeros(uintToString(suffix), decimals)));
+        }
+
+        return result;
+    }
+
+    function uintToString(uint256 value) internal pure returns (string memory) {
+        if (value == 0) {
+            return "0";
+        }
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+        bytes memory buffer = new bytes(digits);
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
+            value /= 10;
+        }
+        return string(buffer);
+    }
+
+    function padWithZeros(string memory input, uint256 length) internal pure returns (string memory) {
+        bytes memory buffer = new bytes(length);
+        bytes memory inputBytes = bytes(input);
+
+        uint256 i = 0;
+        while (i < length - inputBytes.length) {
+            buffer[i] = '0';
+            i++;
+        }
+
+        for (uint256 j = 0; j < inputBytes.length; j++) {
+            buffer[i] = inputBytes[j];
+            i++;
+        }
+
+        return string(buffer);
     }
 }
