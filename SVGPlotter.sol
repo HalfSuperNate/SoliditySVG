@@ -51,13 +51,13 @@ contract SVGPlotter {
     using Base64 for string;
 
     string constant __ = " "; // whitespace
-    string constant stroke = '" stroke="';
+    string constant stroke = ' stroke="';
     string constant strokeWidth = ' stroke-width="';
     string constant fill = ' fill="';
     string constant _startElement = "<";
-    string constant _endElement = " />";
+    string constant _endElement = ' />';
     string constant _dq = '"';
-    string constant none = '"none"';
+    string constant none = 'none" ';
     string constant height = ' height="';
     string constant width = ' width="';
     string constant background = ' style="background:#';
@@ -66,6 +66,7 @@ contract SVGPlotter {
     string constant _endGroup = '</g>';
     string constant _n = "-"; // negative
 
+    mapping(uint256 => string) public elementType;
 
     struct SVG {
         uint256[2] heightWidth;
@@ -76,28 +77,28 @@ contract SVGPlotter {
     struct StrokeFill {
         uint256 strokeWidth;
         uint256[4] stroke;
-        uint256[4][2] randomizeStroke; // if [0,0] ignore
+        uint256[2][4] randomStroke; // if all [0,0] ignores random
         uint256[4] fill;
-        uint256[4][2] randomizeFill; // if [0,0] ignore
+        uint256[2][4] randomFill; // if all [0,0] ignores random
     }
 
     struct ElementData {
         uint256 decimals; // number of decimal points for floats
         /*
-            polygon = uses at least 3 points where 1st and last point is connected
             circle = uses 2 points, 1st point is center position, 2nd is radius x = y
             ellipse = uses 2 points, 1st point is center position, 2nd is radius x & radius y
-            rect = uses 2 points, 1st is top left corner position, 2nd is width & height from 1st point
             line = uses 2 points, 1st is start position, 2nd is end position
-            polyline = uses at least 3 points
             path = uses points and letter commands to create a complex line or shape
+            polygon = uses at least 3 points where 1st and last point is connected
+            polyline = uses at least 3 points
+            rect = uses 2 points, 1st is top left corner position, 2nd is width & height from 1st point
         */
         string elementType;
         // point position(s)
         int256[] x;
-        int256[][2] randomizeX; // if [0,0] ignore
+        int256[2][] randomX; // if all [0,0] ignores random
         int256[] y;
-        int256[][2] randomizeY; // if [0,0] ignore
+        int256[2][] randomY; // if all [0,0] ignores random
         /*
             Path Command Notes:
                 Capital = absolute position
@@ -124,7 +125,7 @@ contract SVGPlotter {
         int256[2] position;
         int256[3] rotation;
         int256 scale;
-        uint256[4][2] randomizeXYRS; // if [0,0] ignore
+        int256[2][4] randomXYRS; // if all [0,0] ignores random
     }
 
     function createSVG(SVG memory svg) public pure returns (string memory) {
@@ -147,33 +148,6 @@ contract SVGPlotter {
         );
     }
 
-    //❌ working on this
-    function createElement(ElementData memory _elementData, StrokeFill memory _strokeFill, Transform memory _transform) internal pure returns (string memory) {
-        string memory attributes;
-        // Data
-        // Stroke & Fill
-        if(_strokeFill.strokeWidth != 0 && _strokeFill.stroke[3] != 0) {
-            attributes = string(abi.encodePacked(attributes, stroke, strokeWidth, fill));
-        } else{
-            //transparent or no stroke
-            attributes = string(abi.encodePacked(attributes, stroke, strokeWidth, fill));
-        }
-        if(_strokeFill.fill[3] != 0) {
-            attributes = string(abi.encodePacked(attributes, stroke, strokeWidth, fill));
-        } else{
-            //transparent or no fill
-            attributes = string(abi.encodePacked(attributes, stroke, strokeWidth, fill));
-        }
-        
-        // Inline Transform
-        if(!_transform.useDefault) {
-            attributes = string(abi.encodePacked(attributes, ' transform="translate(', _transform.position[0],",", _transform.position[1],' rotate(', _transform.rotation[0], ",",  _transform.rotation[1], ",",  _transform.rotation[2], ') scale(',  _transform.scale, ')"' ));
-        } else{
-            //use nothing to default to transform="translate(0, 0) rotate(0) scale(1)"
-        }
-        return string(abi.encodePacked(_startElement, _elementData.elementType, __, attributes, __, _endElement));
-    }
-
     function getHeightWidth(uint256 _height, uint256 _width) public pure returns (string memory) {
         return string.concat(
             height, _height.toString(), _dq,
@@ -188,6 +162,95 @@ contract SVGPlotter {
         );
     }
 
+    function setElementType() public {
+        require(elementType[0] == "", "Already Set");
+        elementType[0] = "circle";
+        elementType[1] = "ellipse";
+        elementType[2] = "line";
+        elementType[3] = "path";
+        elementType[4] = "polygon";
+        elementType[5] = "polyline";
+        elementType[6] = "rect";
+    }
+
+    function getElementType(uint256 _typeID) public view returns (string memory) {
+        return elementType[_typeID];
+    }
+
+    function createElement(ElementData memory _elementData, StrokeFill memory _strokeFill, Transform memory _transform) internal view returns (string memory) {
+        string memory attributes;
+        // Data
+
+        // Stroke
+        // stroke="#ff25ffff" stroke-width="1"
+        if(_strokeFill.strokeWidth != 0 && _strokeFill.stroke[3] != 0) {
+            if(isAllZeroes(_strokeFill.randomStroke)) {
+                // specific color/alpha
+                attributes = string(abi.encodePacked(attributes, stroke, uintToColorHex(true, _strokeFill.stroke[0], _strokeFill.stroke[1], _strokeFill.stroke[2], _strokeFill.stroke[3]), _dq, strokeWidth, _strokeFill.strokeWidth, _dq));
+            } else{
+                // random color/alpha
+                attributes = string(abi.encodePacked(attributes, stroke, uintToColorHex(true, uint(getRandom(3, int(_strokeFill.randomStroke[0][0]), int(_strokeFill.randomStroke[0][1]))), uint(getRandom(5, int(_strokeFill.randomStroke[1][0]), int(_strokeFill.randomStroke[1][1]))), uint(getRandom(4, int(_strokeFill.randomStroke[2][0]), int(_strokeFill.randomStroke[2][1]))), uint(getRandom(6, int(_strokeFill.randomStroke[3][0]), int(_strokeFill.randomStroke[3][1])))), _dq, strokeWidth, _strokeFill.strokeWidth, _dq));
+            }
+        } else{
+            //transparent or no stroke
+            attributes = string(abi.encodePacked(attributes, stroke, none));
+        }
+
+        // Fill
+        // fill="#FFBF00FF"
+        if(_strokeFill.fill[3] != 0) {
+            if(isAllZeroes(_strokeFill.randomStroke)) {
+                // specific color/alpha
+                attributes = string(abi.encodePacked(attributes, fill, uintToColorHex(true, _strokeFill.fill[0], _strokeFill.fill[1], _strokeFill.fill[2], _strokeFill.fill[3]), _dq));
+            } else{
+                // random color/alpha
+                attributes = string(abi.encodePacked(attributes, fill, uintToColorHex(true, uint(getRandom(3, int(_strokeFill.randomFill[0][0]), int(_strokeFill.randomFill[0][1]))), uint(getRandom(5, int(_strokeFill.randomFill[1][0]), int(_strokeFill.randomFill[1][1]))), uint(getRandom(4, int(_strokeFill.randomFill[2][0]), int(_strokeFill.randomFill[2][1]))), uint(getRandom(6, int(_strokeFill.randomFill[3][0]), int(_strokeFill.randomFill[3][1])))), _dq));
+            }
+        } else{
+            //transparent or no fill
+            attributes = string(abi.encodePacked(attributes, fill, none));
+        }
+        
+        // Inline Transform
+        // a blank transform will default to:
+        // transform="translate(0, 0) rotate(0) scale(1)"
+        if(!_transform.useDefault) {
+            if(isAllZeroesInt(_transform.randomXYRS)) {
+                // specific transform
+                attributes = string(abi.encodePacked(attributes, ' transform="translate(', _transform.position[0], ",", _transform.position[1],' rotate(', _transform.rotation[0], ",",  _transform.rotation[1], ",",  _transform.rotation[2], ') scale(',  _transform.scale, ')"' ));
+            } else{
+                // random transform
+                attributes = string(abi.encodePacked(attributes, ' transform="translate(', getRandom(9, _transform.randomXYRS[0][0], _transform.randomXYRS[0][1]), ",", getRandom(9, _transform.randomXYRS[1][0], _transform.randomXYRS[1][1]),' rotate(', getRandom(6, _transform.randomXYRS[2][0], _transform.randomXYRS[2][1]), ",",  _transform.rotation[1], ",",  _transform.rotation[2], ') scale(',  getRandom(5, _transform.randomXYRS[3][0], _transform.randomXYRS[3][1]), ')"' ));
+            }
+        }
+        return string(abi.encodePacked(_startElement, _elementData.elementType, __, attributes, _endElement));
+    }
+
+    // Function to check if each index contains [0, 0]
+    function isAllZeroes(uint256[2][4] memory _checkArray) internal pure returns (bool) {
+        for (uint256 i = 0; i < _checkArray.length; i++) {
+            for (uint256 j = 0; j < _checkArray[i].length; j++) {
+                if (_checkArray[i][j] != 0) {
+                    return false;
+                }
+            }
+        }
+        // [[0,0],[0,0],[0,0],[0,0]]
+        return true;
+    }
+
+    function isAllZeroesInt(int256[2][4] memory _checkArray) internal pure returns (bool) {
+        for (uint256 i = 0; i < _checkArray.length; i++) {
+            for (uint256 j = 0; j < _checkArray[i].length; j++) {
+                if (_checkArray[i][j] != 0) {
+                    return false;
+                }
+            }
+        }
+        // [[0,0],[0,0],[0,0],[0,0]]
+        return true;
+    }
+
     /**
     @dev Returns a random number in the range of min and max.
     @param _seed The random user input number.
@@ -196,6 +259,7 @@ contract SVGPlotter {
     @return A random selected number within the inclusive range.
     */
     function getRandom(uint _seed, int _min, int _max) public view returns (int256){
+        if(_min == _max) return _min;
         uint random = uint(keccak256(abi.encodePacked(
             block.timestamp,
             block.prevrandao,
