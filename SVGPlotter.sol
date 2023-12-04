@@ -163,7 +163,7 @@ contract SVGPlotter {
     }
 
     function setElementType() public {
-        require(elementType[0] == "", "Already Set");
+        require(bytes(elementType[0]).length == 0, "Already Set");
         elementType[0] = "circle";
         elementType[1] = "ellipse";
         elementType[2] = "line";
