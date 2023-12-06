@@ -93,7 +93,7 @@ contract SVGPlotter {
             polyline = uses at least 3 points
             rect = uses 2 points, 1st is top left corner position, 2nd is width & height from 1st point
         */
-        string elementType;
+        uint256 elementTypeID;
         // point position(s)
         int256[] x;
         int256[2][] randomX; // if all [0,0] ignores random
@@ -115,7 +115,7 @@ contract SVGPlotter {
                 A = elliptical Arc
                 Z = closepath
         */
-        string[] pathCommands;
+        string[] data; // holds path commands or custom data where index 0 is element type and 1 is data
 
         // inline transform and stroke/fill can be added when element is created
     }
@@ -126,6 +126,10 @@ contract SVGPlotter {
         int256[3] rotation;
         int256 scale;
         int256[2][4] randomXYRS; // if all [0,0] ignores random
+    }
+
+    constructor() {
+        setBasicElementTypes();
     }
 
     function createSVG(SVG memory svg) public pure returns (string memory) {
@@ -139,7 +143,7 @@ contract SVGPlotter {
         ));
     }
 
-    function setSVG(SVG memory svg) public pure returns (string memory) {
+    function setSVG(SVG memory svg) internal pure returns (string memory) {
         return string.concat(
             "<svg", 
             getHeightWidth(svg.heightWidth[0],svg.heightWidth[1]),
@@ -148,38 +152,93 @@ contract SVGPlotter {
         );
     }
 
-    function getHeightWidth(uint256 _height, uint256 _width) public pure returns (string memory) {
+    function getHeightWidth(uint256 _height, uint256 _width) internal pure returns (string memory) {
         return string.concat(
             height, _height.toString(), _dq,
             width, _width.toString(), _dq
         );
     }
 
-    function getBackground(uint256[4] memory _color) public pure returns (string memory) {
+    function getBackground(uint256[4] memory _color) internal pure returns (string memory) {
         return string.concat(
             background,
             uintToColorHex(false, _color[0], _color[1], _color[2], _color[3])
         );
     }
 
-    function setElementType() public {
+    function setBasicElementTypes() internal {
         require(bytes(elementType[0]).length == 0, "Already Set");
-        elementType[0] = "circle";
-        elementType[1] = "ellipse";
-        elementType[2] = "line";
-        elementType[3] = "path";
-        elementType[4] = "polygon";
-        elementType[5] = "polyline";
-        elementType[6] = "rect";
+        elementType[0] = "";
+        elementType[1] = "circle";
+        elementType[2] = "ellipse";
+        elementType[3] = "line";
+        elementType[4] = "path";
+        elementType[5] = "polygon";
+        elementType[6] = "polyline";
+        elementType[7] = "rect";
     }
 
     function getElementType(uint256 _typeID) public view returns (string memory) {
         return elementType[_typeID];
     }
 
+    // ❌ NEED TO ADD RANDOMIZED OPTION
+    function getElementData(ElementData memory _elementData) public pure returns (string memory) {
+        if(_elementData.elementTypeID == 0){
+            return _elementData.data[1];
+        }
+        if(_elementData.elementTypeID == 1){
+            //circle // cx="125" cy="125" r="125"
+            return string(abi.encodePacked('cx="', _elementData.x[0].toString(), '" cy="', _elementData.y[0].toString(), '" r="', _elementData.x[1].toString(), '"'));
+        }
+        if(_elementData.elementTypeID == 2){
+            //ellipse // cx="125" cy="125" rx="100" ry="50"
+            return string(abi.encodePacked('cx="', _elementData.x[0].toString(), '" cy="', _elementData.y[0].toString(), '" rx="', _elementData.x[1].toString(), '" ry="', _elementData.y[1].toString(), '"'));
+        }
+        if(_elementData.elementTypeID == 3){
+            //line // x1="10" y1="0" x2="210" y2="200"
+            return string(abi.encodePacked('x1="', _elementData.x[0].toString(), '" y1="', _elementData.y[0].toString(), '" x2="', _elementData.x[1].toString(), '" y2="', _elementData.y[1].toString(), '"'));
+        }
+        if(_elementData.elementTypeID == 4){
+            //path // d="M 100 350 q 200 200 300 -300 z "
+            string memory drawCommands = "";
+            for (uint256 i = 0; i < _elementData.data.length; i++) {
+                drawCommands = string(abi.encodePacked(drawCommands, _elementData.data[i], __));
+            }
+            return string(abi.encodePacked('d="', drawCommands, '"'));
+        }
+        if(_elementData.elementTypeID == 5){
+            //polygon // points="0,0 250,250 0,250 "
+            string memory points = "";
+            for (uint256 i = 0; i < _elementData.x.length; i++) {
+                points = string(abi.encodePacked(points, _elementData.x[i], ',', _elementData.y[i], __));
+            }
+            return string(abi.encodePacked('points="', points, '"'));
+        }
+        if(_elementData.elementTypeID == 6){
+            //polyline // points="20,20 40,25 60,40 80,120 120,140 200,180 "
+            string memory points = "";
+            for (uint256 i = 0; i < _elementData.x.length; i++) {
+                points = string(abi.encodePacked(points, _elementData.x[i], ',', _elementData.y[i], __));
+            }
+            return string(abi.encodePacked('points="', points, '"'));
+        }
+        if(_elementData.elementTypeID == 7){
+            //rect // x="100" y="100" width="25" height="100"
+            return string(abi.encodePacked('x="', _elementData.x[0].toString(), '" y="', _elementData.y[0].toString(), '" width="', _elementData.x[1].toString(), '" height="', _elementData.y[1].toString(), '"'));
+        }
+        return "No Data";
+    }
+
     function createElement(ElementData memory _elementData, StrokeFill memory _strokeFill, Transform memory _transform) internal view returns (string memory) {
         string memory attributes;
-        // Data
+
+        // Element Type & Data
+        if(_elementData.elementTypeID != 0){
+            attributes = string(abi.encodePacked(getElementType(_elementData.elementTypeID), __, getElementData(_elementData)));
+        } else{
+            attributes = string(abi.encodePacked(_elementData.data[0], __, _elementData.data[1]));
+        }
 
         // Stroke
         // stroke="#ff25ffff" stroke-width="1"
@@ -223,7 +282,8 @@ contract SVGPlotter {
                 attributes = string(abi.encodePacked(attributes, ' transform="translate(', getRandom(9, _transform.randomXYRS[0][0], _transform.randomXYRS[0][1]), ",", getRandom(9, _transform.randomXYRS[1][0], _transform.randomXYRS[1][1]),' rotate(', getRandom(6, _transform.randomXYRS[2][0], _transform.randomXYRS[2][1]), ",",  _transform.rotation[1], ",",  _transform.rotation[2], ') scale(',  getRandom(5, _transform.randomXYRS[3][0], _transform.randomXYRS[3][1]), ')"' ));
             }
         }
-        return string(abi.encodePacked(_startElement, _elementData.elementType, __, attributes, _endElement));
+
+        return string(abi.encodePacked(_startElement, attributes, _endElement));
     }
 
     // Function to check if each index contains [0, 0]
