@@ -82,6 +82,7 @@ contract SVGPlotter {
         uint256[2][4] randomFill; // if all [0,0] ignores random
     }
 
+    // [18,6,[1,2,3,4,-5],[[0,0],[0,0]],[-5,4,3,2,1],[[0,0],[0,0]],[""]]
     struct ElementData {
         uint256 decimals; // number of decimal points for floats
         /*
@@ -189,15 +190,15 @@ contract SVGPlotter {
         }
         if(_elementData.elementTypeID == 1){
             //circle // cx="125" cy="125" r="125"
-            return string(abi.encodePacked('cx="', _elementData.x[0].toString(), '" cy="', _elementData.y[0].toString(), '" r="', _elementData.x[1].toString(), '"'));
+            return string(abi.encodePacked('cx="', _elementData.x[0].toString(), '" cy="', _elementData.y[0].toString(), '" r="', _elementData.x[1].toString(), _dq));
         }
         if(_elementData.elementTypeID == 2){
             //ellipse // cx="125" cy="125" rx="100" ry="50"
-            return string(abi.encodePacked('cx="', _elementData.x[0].toString(), '" cy="', _elementData.y[0].toString(), '" rx="', _elementData.x[1].toString(), '" ry="', _elementData.y[1].toString(), '"'));
+            return string(abi.encodePacked('cx="', _elementData.x[0].toString(), '" cy="', _elementData.y[0].toString(), '" rx="', _elementData.x[1].toString(), '" ry="', _elementData.y[1].toString(), _dq));
         }
         if(_elementData.elementTypeID == 3){
             //line // x1="10" y1="0" x2="210" y2="200"
-            return string(abi.encodePacked('x1="', _elementData.x[0].toString(), '" y1="', _elementData.y[0].toString(), '" x2="', _elementData.x[1].toString(), '" y2="', _elementData.y[1].toString(), '"'));
+            return string(abi.encodePacked('x1="', _elementData.x[0].toString(), '" y1="', _elementData.y[0].toString(), '" x2="', _elementData.x[1].toString(), '" y2="', _elementData.y[1].toString(), _dq));
         }
         if(_elementData.elementTypeID == 4){
             //path // d="M 100 350 q 200 200 300 -300 z "
@@ -205,7 +206,7 @@ contract SVGPlotter {
             for (uint256 i = 0; i < _elementData.data.length; i++) {
                 drawCommands = string(abi.encodePacked(drawCommands, _elementData.data[i], __));
             }
-            return string(abi.encodePacked('d="', drawCommands, '"'));
+            return string(abi.encodePacked('d="', drawCommands, _dq));
         }
         if(_elementData.elementTypeID == 5){
             //polygon // points="0,0 250,250 0,250 "
@@ -213,19 +214,19 @@ contract SVGPlotter {
             for (uint256 i = 0; i < _elementData.x.length; i++) {
                 points = string(abi.encodePacked(points, _elementData.x[i], ',', _elementData.y[i], __));
             }
-            return string(abi.encodePacked('points="', points, '"'));
+            return string(abi.encodePacked('points="', points, _dq));
         }
         if(_elementData.elementTypeID == 6){
             //polyline // points="20,20 40,25 60,40 80,120 120,140 200,180 "
             string memory points = "";
             for (uint256 i = 0; i < _elementData.x.length; i++) {
-                points = string(abi.encodePacked(points, _elementData.x[i], ',', _elementData.y[i], __));
+                points = string(abi.encodePacked(points, _elementData.x[i].toString(), ',', _elementData.y[i].toString(), __));
             }
-            return string(abi.encodePacked('points="', points, '"'));
+            return string(abi.encodePacked('points="', points, _dq));
         }
         if(_elementData.elementTypeID == 7){
             //rect // x="100" y="100" width="25" height="100"
-            return string(abi.encodePacked('x="', _elementData.x[0].toString(), '" y="', _elementData.y[0].toString(), '" width="', _elementData.x[1].toString(), '" height="', _elementData.y[1].toString(), '"'));
+            return string(abi.encodePacked('x="', _elementData.x[0].toString(), '" y="', _elementData.y[0].toString(), '" width="', _elementData.x[1].toString(), '" height="', _elementData.y[1].toString(), _dq));
         }
         return "No Data";
     }
